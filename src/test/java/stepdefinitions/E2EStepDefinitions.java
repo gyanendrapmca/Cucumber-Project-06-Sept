@@ -1,12 +1,10 @@
 package stepdefinitions;
 
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
 import org.junit.runner.RunWith;
-import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.Select;
 
@@ -15,112 +13,114 @@ import cucumber.api.java.en.And;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.When;
 import cucumber.api.junit.Cucumber;
+import dataProvider.ConfigFileReader;
 import io.github.bonigarcia.wdm.WebDriverManager;
+import managers.Base;
+import pageObjects.CartPage;
+import pageObjects.CheckOutPage;
+import pageObjects.HomePage;
+import pageObjects.ProductListingPage;
 
 @RunWith(Cucumber.class)
 public class E2EStepDefinitions {
 	private WebDriver driver;
-	
+	private HomePage homePage;
+	private ProductListingPage plist;
+	private CheckOutPage chk;
+	private CartPage cartPage;
+	private Base base;
+	private ConfigFileReader config;
+
 	@Given("^user is on Home Page$")
-    public void user_is_on_home_page(){
-        WebDriverManager.chromedriver().setup();
-        driver = new ChromeDriver();
-		driver.manage().window().maximize();
-		driver.manage().timeouts().implicitlyWait(20, TimeUnit.SECONDS);
-		driver.get("http://www.shop.demoqa.com");
-    }
+	public void user_is_on_home_page() throws IOException {
+		WebDriverManager.chromedriver().setup();
+
+		config = new ConfigFileReader();
+		driver = new ChromeDriver();
+		base = new Base(driver);
+
+		homePage = base.getInstanceOfHomePage();
+		homePage.navigateToHomePage(config.getUrl());
+	}
 
 	@When("^he search for \"([^\"]*)\"$")
-    public void he_search_for_dress(String dress){
-		driver.navigate().to("http://shop.demoqa.com/?s=" + dress + "&post_type=product");
-    }
+	public void he_search_for_dress(String dress) {
+		homePage.performSearch(dress);
+	}
 
-    @And("^choose to buy the first item$")
-    public void choose_to_buy_the_first_item() throws InterruptedException{
-    	List<WebElement> items = driver.findElements(By.cssSelector(".noo-product-inner"));
-		items.get(0).click();
+	@And("^choose to buy the first item$")
+	public void choose_to_buy_the_first_item() throws InterruptedException {
+		plist = base.getInstanceOfProductListing();
+		plist.selectProduct(1);
 
 		Thread.sleep(10000);
-		Select color = new Select(driver.findElement(By.id("pa_color")));
+		Select color = plist.productColor();
 		color.selectByIndex(1);
-		Select size = new Select(driver.findElement(By.id("pa_size")));
+		Select size = plist.productSize();
 		size.selectByIndex(2);
-		for (int i = 1; i <= 3; i++)
-			driver.findElement(By.cssSelector("button.qty-increase")).click();
-		Thread.sleep(10000);
-		
-		WebElement addToCart = driver.findElement(By.cssSelector("button.single_add_to_cart_button"));
-		addToCart.click();
-    }
 
-    @And("^moves to checkout from mini cart$")
-    public void moves_to_checkout_from_mini_cart(){
-    	WebElement cart = driver.findElement(By.cssSelector(".cart-button"));
-		cart.click();
-
-		WebElement continueToCheckout = driver.findElement(By.cssSelector(".checkout-button.alt"));
-		continueToCheckout.click();
-    }
-
-    @And("^enter personal details on checkout page$")
-    public void enter_personal_details_on_checkout_page() throws InterruptedException{
-    	Thread.sleep(5000);
-		WebElement firstName = driver.findElement(By.cssSelector("#billing_first_name"));
-		firstName.sendKeys("Lakshay");
-
-		WebElement lastName = driver.findElement(By.cssSelector("#billing_last_name"));
-		lastName.sendKeys("Sharma");
-
-		WebElement countryDropDown = driver.findElement(By.cssSelector("#select2-billing_state-container"));
-		countryDropDown.click();
+		plist.clickQuantityIncrease();
 		Thread.sleep(10000);
 
-		List<WebElement> countryList = driver.findElements(By.cssSelector("#select2-drop ul li"));
-		for (WebElement country : countryList) {
-			if (country.getText().equals("India")) {
-				country.click();
-				Thread.sleep(3000);
-				break;
-			}
-		}
+		plist.clickAddToCart();
+	}
 
-		WebElement emailAddress = driver.findElement(By.cssSelector("#billing_email"));
-		emailAddress.sendKeys("test@gmail.com");
+	@And("^moves to checkout from mini cart$")
+	public void moves_to_checkout_from_mini_cart() {
+		cartPage = base.getInstanceOfCartPage();
 
-		WebElement phone = driver.findElement(By.cssSelector("#billing_phone"));
-		phone.sendKeys("07438862327");
-		
-		WebElement city = driver.findElement(By.cssSelector("#billing_city"));
-		city.sendKeys("Delhi");
+		cartPage.clickOnCartButton();
+		cartPage.clickOnContinueToCheckOut();
+	}
 
-		WebElement address = driver.findElement(By.cssSelector("#billing_address_1"));
-		address.sendKeys("Shalimar Bagh");
+	@And("^enter personal details on checkout page$")
+	public void enter_personal_details_on_checkout_page() throws InterruptedException {
+		chk = base.getInstanceOfCheckOutPage();
+		Thread.sleep(5000);
 
-		WebElement postcode = driver.findElement(By.cssSelector("#billing_postcode"));
-		postcode.sendKeys("110088");
-    }
+		chk.enterFirstName("Lakshay");
+		chk.enterLastName("Sharma");
+		chk.enterCompanyName("QA TOOLS");
 
-    @And("^select same delivery address$")
-    public void select_same_delivery_address(){
-        System.out.println("Select same delivery address");
-    }
+		chk.clickOnCountryDropDown();
+		chk.selectCountryStateOption("India");
 
-    @And("^select payment method as \"([^\"]*)\" payment$")
-    public void select_payment_method_as_check_payment(String check){
-        System.out.println("Select payment method as "+check+" payment.");
-    }
+		chk.enterHouseNo("BLOCK A-11");
+		chk.enterAppartment("Crown Plaza");
+		chk.enterCityName("New Delhi");
 
-    @And("^place the order$")
-    public void place_the_order(){
-    	WebElement acceptTC = driver.findElement(By.cssSelector("#terms.input-checkbox"));
-		acceptTC.click();
+		chk.clickOnStateDropDown();
+		chk.selectCountryStateOption("Bihar");
+		Thread.sleep(3000);
 
-		WebElement placeOrder = driver.findElement(By.cssSelector("#place_order"));
-		placeOrder.submit();
-    }
-    
-    @After
-    public void tearDown() {
-    	driver.close();
-    }
+		chk.enterPostCode("122244");
+		chk.enterPhone("+91-8965336569");
+		chk.enterEmail("lksharma@gmail.com");
+		Thread.sleep(3000);
+	}
+
+	@And("^select same delivery address$")
+	public void select_same_delivery_address() {
+		System.out.println("Select same delivery address");
+		JavascriptExecutor js = (JavascriptExecutor) driver;
+		js.executeScript("window.scrollBy(0,-50)");
+	}
+
+	@And("^select payment method as \"([^\"]*)\" payment$")
+	public void select_payment_method_as_check_payment(String check) {
+		System.out.println("Select payment method as " + check + " payment.");
+	}
+
+	@And("^place the order$")
+	public void place_the_order() throws InterruptedException {
+		Thread.sleep(3000);
+		chk.clickOnAcceptTerm();
+		chk.clickOnPlaceOrder();
+		Thread.sleep(3000);
+	}
+
+	@After
+	public void tearDown() {
+		driver.close();
+	}
 }
